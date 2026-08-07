@@ -17,6 +17,7 @@ function Board:setup()
 	-- Call on start and to reset the board
 	self:initSpaces()
 	self:setupPieces()
+	self.pickedUpPiece = nil
 end
 
 function Board:initSpaces()
@@ -72,6 +73,23 @@ function Board:selectSpace(space)
 	end
 	space.highlight = true
 	space:onSelect()
+end
+
+function Board:onPress(x, y)
+	local space = self:getSpaceAt(x, y)
+	if space then
+		self:selectSpace(space)
+		self.pickedUpPiece = space.piece
+	end
+end
+
+function Board:onRelease()
+	-- TODO: if a state switch happens mid-drag, onRelease only runs in the Chess
+	-- state, so pickedUpPiece would never be cleared. Clear it on state change.
+	if self.pickedUpPiece then
+		self.pickedUpPiece:putDown()
+		self.pickedUpPiece = nil
+	end
 end
 
 function Board:update()

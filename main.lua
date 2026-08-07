@@ -1,24 +1,14 @@
-local Debug = require("src/Debug")
-local Input = require("src/Input")
-local board = require("src/chess/Board")
+local GSM = require("src/GameStateManager")
 
 function love.load()
-	board:loadSprites()
-	board:setup()
+	GSM:load()
 end
 
-function love.update()
-	Input.update()
-	local x, y = Input.getClick()
-	if x then
-		local space = board:getSpaceAt(x, y)
-		if space then board:selectSpace(space) end
-	end
-	board:update()
+function love.update(dt)
+	GSM:update(dt)
 end
 
 function love.draw()
 	love.graphics.setBackgroundColor({0.2,0.2,0.2,1})
-	board:draw()
-	Debug:draw()
+	GSM:draw()
 end
