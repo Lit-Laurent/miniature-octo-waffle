@@ -32,23 +32,27 @@ function GameStateManager:setGameState(newState)
 	--[[KeyEventsManager:load(STATE_EVENTS[self.state], {
 		setGameState = function(state) self:setGameState(state) end,
 	})
-	InputManager:resetHeldKeys()]]--
+	InputManager:resetHeldKeys()
+	]]--
+end
+
+function GameStateManager._updateInPlay() -- TODO: Rename this idk what to call it
+	if Input.pressed then
+		board:onPress(Input.pressX, Input.pressY)
+	end
+	if Input.released then
+		board:onRelease(Input.releaseX, Input.releaseY)
+	end
+	board:update(Input)
 end
 
 function GameStateManager:update(dt)
 	if self.state == "StartMenu" then
 		-- StartMenu:update(dt)
 	elseif self.state == "Chess" then
-		if Input.pressed then
-			board:onPress(Input.pressX, Input.pressY)
-		end
-		if Input.released then
-			board:onRelease()
-		end
-		-- Any In Game Updates
-		board:update()
+		self._updateInPlay()
 	end
-	Input:clearFlags()
+	Input:resetFlags()
 end
 
 function GameStateManager:draw()

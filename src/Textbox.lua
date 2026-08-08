@@ -1,30 +1,29 @@
 -- Font Setup
+
 local FONT_FILES = {'assets/MononokiNerdFontPropo-Regular.ttf'}
 local DEFAULT_FONT = FONT_FILES[1]
 local DEFAULT_FONT_SIZE = 20
 local Font_Cache = {}
-Font_Cache[DEFAULT_FONT] = {[DEFAULT_FONT_SIZE] = love.graphics.newFont(DEFAULT_FONT, DEFAULT_FONT_SIZE)}
-local Current_Font = Font_Cache[DEFAULT_FONT][DEFAULT_FONT_SIZE]
-love.graphics.setFont(Current_Font)
+local Current_Font
 
 local Textbox = {}
 Textbox.__index = Textbox
 
 function Textbox:new(m, x, y, boxW, boxH, boxVisible, boxColor, textColor)
 	local o = {}
-	setmetatable(o,self) -- NOTE: Does setting things like visible in here using self pointless, would I need to just declare it in the override (what I assume o variable is for)
+	setmetatable(o,self)
 	o.msg = m
 	o.x = x
 	o.y = y
-	o.visible = self.visible or true
+	o.visible = o.visible or true
 	o.textColor = textColor or {0,0,0,1}
 
 	o.boxW = boxW
 	o.boxH = boxH
 	o.boxVisible = boxVisible
 	o.boxColor = boxColor or {1,1,1,0.5}
-	o.font = self.font or DEFAULT_FONT
-	o.fontSize = self.fontSize or DEFAULT_FONT_SIZE
+	o.font = o.font or DEFAULT_FONT
+	o.fontSize = o.fontSize or DEFAULT_FONT_SIZE
 	o:loadFont(o.font,o.fontSize)
 	return o
 end
@@ -74,7 +73,7 @@ end
 function Textbox:draw()
 	if self.visible then
 		if self.loadedFont and self.loadedFont ~= Current_Font then
-			-- Checks if loadedFont exists and if its the Current_Font, otherwise sets it and Current_Font
+			-- Checks if loadedFont exists and if it's the Current_Font, otherwise sets it and Current_Font
 			love.graphics.setFont(self.loadedFont)
 			Current_Font = self.loadedFont
 		end

@@ -1,16 +1,28 @@
 local _C = require("src/Constants")
 
+local Debug = require("src/Debug")
+
 local Space = {}
 Space.__index = Space
 
-function Space:new(file,rank,color,xm,ym)
+function Space:loadSprites()
+	self.hoverIndicatorSprite = love.graphics.newImage("assets/hoverIndicator.png")
+end
+
+function Space:new(file,rank,shade,xm,ym)
 	local xmod = xm or 0
 	local ymod = ym or 0
 	local o = {piece = nil}
 	setmetatable(o,self)
 	o.rank = rank
 	o.file = file
-	o.color = color
+	o.shade = shade
+
+	if shade == "light" then
+		o.color = _C.COLOR.WSPACE
+	else
+		o.color = _C.COLOR.BSPACE
+	end
 
 	local x = xmod + (file - 1) * _C.SQUARE_SIZE
 	local y = ymod + (_C.BOARD_LEN - rank) * _C.SQUARE_SIZE
@@ -35,27 +47,77 @@ function Space:removePiece()
 	self.piece = nil
 end
 
+function Space:centerPiece()
+	self.piece.pos = self.pos
+end
+
 function Space:movePiece(newSpace)
-	newSpace.piece = self.piece
+	newSpace:setPiece(self.piece)
+	newSpace:centerPiece()
 	self:removePiece()
 end
 
 function Space:onSelect()
-	if self.piece then self.piece:pickUp() end
+	-- If this space was already highlighted, arm a pending deselect.
+	-- It is consumed (deSelect) only when a held piece is released back
+	-- onto this same source square.
+	if self.highlight then
+		self.pendingDeselect = true
+	else self.highlight = true end
+	if self.piece then
+		self.piece:pickUp()
+		local msg = ("Picked up:\n" .. self.piece.side .. " " .. self.piece.class .. " @ " .. _C.FILES[self.file] .. self.rank)
+		Debug:newMessage(msg)
+	end
+
+end
+
+function Space:deSelect()
+	if self.highlight == true then
+		self.highlight = false
+		self.pendingDeselect = false
+	end
 end
 
 function Space:update()
-	if self.piece then self.piece:update() end
+	-- NOTHING YET
 end
 
 function Space:draw()
-	-- Drawing of the Space and optional highlight
+	-- Drawing of the Space and optional highlight/hover indication
 	love.graphics.setColor(self.color)
 	love.graphics.rectangle("fill",unpack(self.area))
 
 	if self.highlight then
-		love.graphics.setColor(0.2, 0.8, 0.2, 0.6)
+		love.graphics.setColor(_C.COLOR.HIGHLIGHT)
 		love.graphics.rectangle("fill", unpack(self.area))
+	elseif self.postMoveHighlight then
+		love.graphics.setColor(_C.COLOR.PM_HIGHLIGHT)
+		love.graphics.rectangle("fill", unpack(self.area))
+	end
+
+	if self.hovered then
+		love.graphics.setColor(_C.COLOR.HOVERINDICATOR)
+		love.graphics.draw(self.hoverIndicatorSprite, unpack(self.pos))
+	end
+
+	-- Draws the aisle mappings on leftmost and downmost aisles
+	local font = love.graphics.getFont()
+	if self.rank == 1 or self.file == 1 then
+		if self.shade == "light" then
+			love.graphics.setColor(_C.COLOR.INDEXES.WS)
+		else
+			love.graphics.setColor(_C.COLOR.INDEXES.BS)
+
+		end
+	end
+	if self.rank == 1 then
+		if not self.rankLabel then self.rankLabel = love.graphics.newText(font,_C.FILES[self.file]) end
+		love.graphics.draw(self.rankLabel,self.x+85,self.y+80)
+	end
+	if self.file == 1 then
+		if not self.fileLabel then self.fileLabel = love.graphics.newText(font, self.rank) end
+		love.graphics.draw(self.fileLabel,self.x,self.y)
 	end
 end
 

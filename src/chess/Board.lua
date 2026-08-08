@@ -2,22 +2,25 @@ local _C = require("src/Constants")
 local Space = require("src/chess/Space")
 local Piece = require("src/chess/Piece")
 
--- FILE IDs
-local FID = {A = 1, B = 2, C = 3, D = 4, E = 5, F = 6, G = 7, H = 8}
+local Debug = require("src/Debug")
 
 local Board = {}
 Board.spacesOffset = {_C.OFFSET_X, _C.OFFSET_Y}
 Board.spaces = {}
 
 function Board:loadSprites()
+	Space:loadSprites()
 	Piece:loadSprites()
 end
 
+----------------
+-- Game Setup --
+----------------
 function Board:setup()
-	-- Call on start and to reset the board
+	-- Call on start and when resetting the board
 	self:initSpaces()
 	self:setupPieces()
-	self.pickedUpPiece = nil
+	self.spaceWithPickedUpPiece = nil
 end
 
 function Board:initSpaces()
@@ -25,21 +28,24 @@ function Board:initSpaces()
 	for file = 1, _C.BOARD_LEN do
 		self.spaces[file] = {}
 		for rank = 1, _C.BOARD_LEN do
-			-- If the sum of file and rank is even give it a Black color
-			local color = (file + rank) % 2 == 0 and {0.1,0.1,0.1,1} or {0.9,0.9,0.9,1}
-			self.spaces[file][rank] = Space:new(file,rank,color,unpack(self.spacesOffset))
+			local shade = (file + rank) % 2 == 0 and "dark" or "light"
+			self.spaces[file][rank] = Space:new(file,rank,shade,unpack(self.spacesOffset))
 		end
 	end
 end
 
 function Board:setupPieces()
+	-- Fill the back two ranks of each side with their own Pieces
 	local sides = {
 		{ side = "white", backrank = 1, pawnrank = 2 },
-		{ side = "black", backrank = 8, pawnrank = 7 },
+		{ side = "black", backrank = _C.BOARD_LEN, pawnrank = _C.BOARD_LEN - 1 },
 	}
+	local FID = {A = 1, B = 2, C = 3, D = 4, E = 5, F = 6, G = 7, H = 8}
 	for _, s in ipairs(sides) do
 		for file = 1, _C.BOARD_LEN do
 			local space = self.spaces[file][s.backrank]
+			-- this is only here because I was messing around with board length
+			if not space then goto continue end
 			if file == FID.A or file == FID.H then
 				space.piece = Piece:new("rook",s.side,space.pos)
 			elseif file == FID.B or file == FID.G then
@@ -51,6 +57,7 @@ function Board:setupPieces()
 			elseif file == FID.E then
 				space.piece = Piece:new("king",s.side,space.pos)
 			end
+			::continue::
 		end
 		for file = 1, _C.BOARD_LEN do
 			local space = self.spaces[file][s.pawnrank]
@@ -59,44 +66,109 @@ function Board:setupPieces()
 	end
 end
 
+-------------
+-- Helpers --
+-------------
+---
 function Board:getSpaceAt(x, y)
+	-- Gets the space at the given x, y
 	local file = math.floor((x - self.spacesOffset[1]) / _C.SQUARE_SIZE) + 1
 	local rank = _C.BOARD_LEN - math.floor((y - self.spacesOffset[2]) / _C.SQUARE_SIZE)
 	return self.spaces[file] and self.spaces[file][rank]
 end
 
-function Board:selectSpace(space)
-	for _, files in ipairs(self.spaces) do
-		for _, _space in ipairs(files) do
-			_space.highlight = false
+-- All spaces run deSelect() if the selectedSpace isn't the highlighted space
+-- then run onSelect() for the selected space
+function Board:selectSpace(selectedSpace)
+	-- This guard is what makes pendingDeselect reachable
+	if not selectedSpace.highlight then
+		for _, files in ipairs(self.spaces) do
+			for _, _space in ipairs(files) do
+				_space:deSelect()
+			end
 		end
 	end
-	space.highlight = true
-	space:onSelect()
+	selectedSpace:onSelect()
 end
 
+--------------------
+--- Input Toggled --
+--------------------
+-- NOTE: When implementing the game state logic, set up a Board:clearForStateChange()
+-- 	needed for fixing some input's persistance such as Board.spaceWithPickedUpPiece
 function Board:onPress(x, y)
 	local space = self:getSpaceAt(x, y)
 	if space then
 		self:selectSpace(space)
-		self.pickedUpPiece = space.piece
+		if space.piece then self.spaceWithPickedUpPiece = space end
 	end
 end
 
-function Board:onRelease()
-	-- TODO: if a state switch happens mid-drag, onRelease only runs in the Chess
-	-- state, so pickedUpPiece would never be cleared. Clear it on state change.
-	if self.pickedUpPiece then
-		self.pickedUpPiece:putDown()
-		self.pickedUpPiece = nil
-	end
-end
-
-function Board:update()
-	for _, file in ipairs(self.spaces) do
-		for _, space in ipairs(file) do
-			space:update()
+function Board:onRelease(x,y)
+	local targetSpace = self:getSpaceAt(x,y)
+	if self.spaceWithPickedUpPiece then
+		if self.hoveredSpace then
+			self.hoveredSpace.hovered = false
+			self.hoveredSpace = nil
 		end
+		if targetSpace and not targetSpace.piece then
+			-- If the targetSpace exists and isn't occupied
+			self.spaceWithPickedUpPiece:movePiece(targetSpace)
+			self.spaceWithPickedUpPiece:deSelect()
+			targetSpace.piece:putDown()
+			-- Reset Previously tracked move's highlights
+			if self.lastMoveSource and self.lastMoveDest then
+				self.lastMoveSource.postMoveHighlight = false
+				self.lastMoveDest.postMoveHighlight = false
+			end
+			-- Track the move
+			self.lastMoveSource = self.spaceWithPickedUpPiece
+			self.lastMoveDest = targetSpace
+			-- Set the post move highlight
+			self.lastMoveSource.postMoveHighlight = true
+			self.lastMoveDest.postMoveHighlight = true
+		elseif targetSpace == self.spaceWithPickedUpPiece then
+			-- If the targetSpace is same as the sourceSpace
+			if self.spaceWithPickedUpPiece.pendingDeselect then
+				-- If its pendingDeselect deselect it
+				self.spaceWithPickedUpPiece:deSelect()
+			end
+			self.spaceWithPickedUpPiece.piece:putDown()
+		else
+			-- Put back the piece with no changes if the move isn't otherwise suitable
+			-- Do not deselect on an invalid move
+			self.spaceWithPickedUpPiece.piece:putDown()
+		end
+		self.spaceWithPickedUpPiece = nil
+	elseif targetSpace then
+		if targetSpace.pendingDeselect then
+			-- If the target Space was empty and pendingDeselect then deselect it
+			targetSpace:deSelect()
+		end
+	end
+	Debug:clearMessages()
+end
+
+function Board:update(input)
+	if self.spaceWithPickedUpPiece then
+		-- Unhover everything
+		for _, file in ipairs(self.spaces) do
+			for _, space in ipairs(file) do
+				space.hovered = false
+			end
+		end
+
+		local mX,mY = input:getMousePos()
+		self.spaceWithPickedUpPiece.piece:followMouse(mX,mY)
+
+		local hoveredSpace = self:getSpaceAt(mX,mY)
+		self.hoveredSpace = hoveredSpace
+		Debug:removeMessage(1)
+		if hoveredSpace then
+			hoveredSpace.hovered = true
+			Debug:newMessage("Hovering @ " .. _C.FILES[hoveredSpace.file] .. hoveredSpace.rank, 1)
+		end
+
 	end
 end
 
@@ -107,14 +179,12 @@ function Board:draw()
 		end
 	end
 	-- Draw all Pieces overall Spaces
-	-- TODO: organize the table by space.piece.z
-	-- 	I only really need to set z to 1 or 0, picked up or not
-	-- 	I think I would only need to organize on pickUp
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
 			if space.piece and space.piece.z == 0 then space.piece:draw() end
 		end
 	end
+	-- The picked up Piece is drawn on top
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
 			if space.piece and space.piece.z == 1 then space.piece:draw() end

@@ -1,5 +1,8 @@
 local _C = require("src/Constants")
 
+-- Used against mouse positions for pickedUp pieces in followMouse()
+local GRAB_OFFSET_X, GRAB_OFFSET_Y = -25, -5
+
 local Piece = {}
 Piece.__index = Piece
 
@@ -24,7 +27,6 @@ function Piece:loadSprites()
 end
 
 function Piece:new(class,side,pos)
-	-- pos is the {x, y} position vector from Space
 	local o = {}
 	setmetatable(o,self)
 	o.class = class
@@ -57,16 +59,15 @@ function Piece:pickUp()
 	self.z = 1
 end
 
-function Piece:putDown() -- TODO: make lifing the mouse cause this action
+function Piece:putDown()
 	self.pickedUp = false
 	self.z = 0
+	self.x, self.y = unpack(self:getPositionOnSpace())
 end
 
-function Piece:update()
+function Piece:followMouse(mX,mY)
 	if self.pickedUp then
-		self.x, self.y = love.mouse.getPosition()
-	else
-		self.x, self.y = unpack(self:getPositionOnSpace())
+		self.x, self.y = mX + GRAB_OFFSET_X, mY + GRAB_OFFSET_Y
 	end
 end
 
