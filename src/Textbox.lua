@@ -65,9 +65,20 @@ end
 
 local function _printCenteredText(rectX, rectY, rectWidth, rectHeight, text)
 	local font = love.graphics.getFont()
+
+	-- Get textHeight based on lines, then Get the width
+	local lineHeight = font:getHeight()
+	local lineCount = 1
+	for _ in text:gmatch("\n") do lineCount = lineCount + 1 end
+	local textHeight = lineHeight * lineCount
 	local textWidth = font:getWidth(text)
-	local textHeight = font:getHeight()
-	love.graphics.print(text, rectX+rectWidth/2, rectY+rectHeight/2, 0, 1, 1, textWidth/2, textHeight/2)
+
+	-- Make sure the centered box/text isn't positioned on a sub-pixel position (Fixes text Blur)
+	local x = math.floor(rectX + rectWidth/2 + 0.5)
+	local y = math.floor(rectY + rectHeight/2 + 0.5)
+	local ox = math.floor(textWidth/2 + 0.5)
+	local oy = math.floor(textHeight/2 + 0.5)
+	love.graphics.print(text, x, y, 0, 1, 1, ox, oy)
 end
 
 function Textbox:draw()
