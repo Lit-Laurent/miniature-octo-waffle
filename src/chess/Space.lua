@@ -61,14 +61,20 @@ function Space:onSelect()
 	-- If this space was already highlighted, arm a pending deselect.
 	-- It is consumed (deSelect) only when a held piece is released back
 	-- onto this same source square.
+	-- local msg
+	Debug:clearMessages()
+	local msg
 	if self.highlight then
 		self.pendingDeselect = true
-	else self.highlight = true end
+	else
+		self.highlight = true
+		msg = ("Space Selected:" .. " @ " .. _C.FILES[self.file] .. self.rank)
+	end
 	if self.piece then
 		self.piece:pickUp()
-		local msg = ("Picked up:\n" .. self.piece.side .. " " .. self.piece.class .. " @ " .. _C.FILES[self.file] .. self.rank)
-		Debug:newMessage(msg)
+		msg = ("Picked up:\n" .. self.piece.side .. " " .. self.piece.class .. " @ " .. _C.FILES[self.file] .. self.rank)
 	end
+	if msg then Debug:newMessage(msg) end
 
 end
 
@@ -76,6 +82,7 @@ function Space:deSelect()
 	if self.highlight == true then
 		self.highlight = false
 		self.pendingDeselect = false
+		Debug:clearMessages()
 	end
 end
 

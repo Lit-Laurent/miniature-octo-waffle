@@ -66,6 +66,7 @@ function Piece:putDown()
 end
 
 function Piece:followMouse(mX,mY)
+	-- TODO: clamp this to the board's x,y,w,h
 	if self.pickedUp then
 		self.x, self.y = mX + GRAB_OFFSET_X, mY + GRAB_OFFSET_Y
 	end

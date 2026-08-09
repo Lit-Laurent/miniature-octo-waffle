@@ -36,12 +36,8 @@ end
 
 function Board:setupPieces()
 	-- Fill the back two ranks of each side with their own Pieces
-	local sides = {
-		{ side = "white", backrank = 1, pawnrank = 2 },
-		{ side = "black", backrank = _C.BOARD_LEN, pawnrank = _C.BOARD_LEN - 1 },
-	}
 	local FID = {A = 1, B = 2, C = 3, D = 4, E = 5, F = 6, G = 7, H = 8}
-	for _, s in ipairs(sides) do
+	for _, s in ipairs(_C.SIDES) do
 		for file = 1, _C.BOARD_LEN do
 			local space = self.spaces[file][s.backrank]
 			-- this is only here because I was messing around with board length
@@ -107,6 +103,7 @@ end
 function Board:onRelease(x,y)
 	local targetSpace = self:getSpaceAt(x,y)
 	if self.spaceWithPickedUpPiece then
+		Debug:clearMessages()
 		if self.hoveredSpace then
 			self.hoveredSpace.hovered = false
 			self.hoveredSpace = nil
@@ -146,7 +143,6 @@ function Board:onRelease(x,y)
 			targetSpace:deSelect()
 		end
 	end
-	Debug:clearMessages()
 end
 
 function Board:update(input)
