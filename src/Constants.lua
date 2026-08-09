@@ -1,4 +1,20 @@
 local Constants = {
+	WINDOW = {
+		W = 900,
+		H = 1000,
+	},
+
+	-- For positioning the board on the Window
+	OFFSET_X    = 50,
+	OFFSET_Y    = 160,
+
+	-- Don't mess with this unless you want wonky chess
+	-- Under 5 there will be no Kings
+	BOARD_LEN   = 8,
+
+	-- Length Spaces' sides
+	SQUARE_SIZE = 100,
+
 	COLOR = {
 		WSPACE =         { 0.9, 0.9, 0.9, 1 },
 		BSPACE =         { 0.1, 0.1, 0.1, 1 },
@@ -17,6 +33,7 @@ local Constants = {
 		-- INDEXES =        { 0.8, 0.5, 0, 1},
 		-- ]]
 	},
+
 	FILES = {
 		"A",
 		"B",
@@ -28,22 +45,11 @@ local Constants = {
 		"H"
 	},
 
-	-- Don't mess with this unless you want wonky chess
-	-- Under 5 there will be no Kings
-	BOARD_LEN   = 8,
-
 	-- This is not set dynamically with BOARD_LEN be careful
 	SIDES = {
 		{ side = "white", backrank = 1, pawnrank = 2 },
 		{ side = "black", backrank = 8, pawnrank = 7 },
 	},
-
-	-- Physical size of a space
-	SQUARE_SIZE = 100,
-
-	-- For positioning the board on the screen
-	OFFSET_X    = 0,
-	OFFSET_Y    = 200,
 
 	KNIGHT_MOVES = { -- For Knight Moves
 		{ dx =  2, dy =  1 },

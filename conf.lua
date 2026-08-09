@@ -1,5 +1,6 @@
+_C = require("src/Constants")
+
 function love.conf(t)
 	t.window.title = "Noob Chess"
-	t.window.width = 800
-	t.window.height = 1000
+	t.window.width, t.window.height = _C.WINDOW.W, _C.WINDOW.H
 end
