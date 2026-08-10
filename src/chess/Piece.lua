@@ -6,7 +6,7 @@ local GRAB_OFFSET_X, GRAB_OFFSET_Y = -40, -40
 local Piece = {}
 Piece.__index = Piece
 
-function Piece:loadSprites()
+function Piece:loadAssets()
 	self.WSPRITES = {
 		pawn = love.graphics.newImage("assets/pieces/wP.png"),
 		rook = love.graphics.newImage("assets/pieces/wR.png"),

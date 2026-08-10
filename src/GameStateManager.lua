@@ -12,7 +12,7 @@ local STATE_EVENTS = {
 }
 
 function GameStateManager:load()
-	board:loadSprites()
+	board:loadAssets()
 	Input:load()
 	self:newGame()
 end

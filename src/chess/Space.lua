@@ -70,35 +70,41 @@ function Space:select()
 	end
 end
 
-function Space:emitPossibleMoveHighlights()
-	-- Use in Board on selected space
-end
-
 function Space:deselect()
 	if self.highlight == true then
 		self.highlight = false
 		self.pendingDeselect = false
 
-		-- Clear Debug Messages on a space deselection
 		Debug:clearMessages()
 	end
 end
-
-
 
 function Space:update()
 	-- Nothin yet
 end
 
-function Space:drawPossibleMoveHighlight()
+-----------
+-- DRAW ---
+-----------
+function Space:drawPossibleMoveOverlay() -- Drawn separately to draw over pieces that are not picked up
+	if self.possibleMove then
+		love.graphics.setColor(1,1,1,0.5)
+		love.graphics.draw(self.moveIndicatorSprite, unpack(self.pos))
+	end
+end
 
+function Space:drawPieceByZ(z) -- 1 for picked up 0 for not
+	if self.piece and self.piece.z == z then
+		self.piece:draw()
+	end
 end
 
 function Space:draw()
-	-- Drawing of the Space and optional highlight/hover indication
+	-- Drawing of the Space
 	love.graphics.setColor(self.color)
 	love.graphics.rectangle("fill",unpack(self.area))
 
+	-- If the space is selected draw the highlight, otherwise, if it was marked from a Piece moving to or from it last move, draw that highlight instead.
 	if self.highlight then
 		love.graphics.setColor(_C.COLOR.HIGHLIGHT)
 		love.graphics.rectangle("fill", unpack(self.area))
@@ -107,12 +113,13 @@ function Space:draw()
 		love.graphics.rectangle("fill", unpack(self.area))
 	end
 
+	-- Draws the hover indicaticator when holding a Piece over a Space
 	if self.hovered then
 		love.graphics.setColor(_C.COLOR.HOVERINDICATOR)
 		love.graphics.draw(self.hoverIndicatorSprite, unpack(self.pos))
 	end
 
-	-- Draws the indexes on the first rank and file	
+	-- Draws the indexes on the first rank and file
 	if self.rank == 1 or self.file == 1 then
 		if self.shade == "light" then love.graphics.setColor(_C.COLOR.INDEXES.WS)
 		else love.graphics.setColor(_C.COLOR.INDEXES.BS) end

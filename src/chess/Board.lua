@@ -10,23 +10,25 @@ local Board = {}
 Board.spacesOffset = {_C.OFFSET_X, _C.OFFSET_Y}
 Board.spaces = {}
 
-function Board:loadSprites()
+function Board:loadAssets()
 	Space:loadAssets()
-	Piece:loadSprites()
+	Piece:loadAssets()
 end
 
-----------------
--- Game Setup --
-----------------
 function Board:setup()
 	-- Call on start and when resetting the board
 	self:initSpaces()
 	self:setupPieces()
-	self.spaceWithPickedUpPiece = nil
 end
 
 function Board:initSpaces()
 	self.spaces = {}
+	-- Tracked Spaces
+	self.selectedSpace = nil
+	self.hoveredSpace = nil
+	self.lastMoveSource = nil
+	self.lastMoveDest = nil
+
 	for file = 1, _C.BOARD_LEN do
 		self.spaces[file] = {}
 		for rank = 1, _C.BOARD_LEN do
@@ -64,9 +66,46 @@ function Board:setupPieces()
 	end
 end
 
--------------
 -- Helpers --
--------------
+function Board:_clearHover()
+	if self.hoveredSpace then self.hoveredSpace.hovered = false end
+	self.hoveredSpace = nil
+end
+
+function Board:_setPossibleMoveOverlays()
+	local movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,self.selectedSpace)
+	if movesForSelectedSpace then
+		for _, moveableSpace in ipairs(movesForSelectedSpace) do
+			moveableSpace.possibleMove = true
+		end
+	end
+end
+
+function Board:_clearPossibleMoveOverlays()
+	for _, file in ipairs(self.spaces) do
+		for _, space in ipairs(file) do
+			space.possibleMove = false
+		end
+	end
+end
+
+function Board:_trackMove(targetSpace)
+	self.lastMoveSource = self.selectedSpace
+	self.lastMoveDest = targetSpace
+
+	-- Set the post move highlight
+	self.lastMoveSource.postMoveHighlight = true
+	self.lastMoveDest.postMoveHighlight = true
+end
+
+function Board:_resetMoveTracking()
+	if self.lastMoveSource and self.lastMoveDest then
+		self.lastMoveSource.postMoveHighlight = false
+		self.lastMoveDest.postMoveHighlight = false
+	end
+end
+
+-- Space selection --
 function Board:getSpaceAt(x, y)
 	-- Gets the space at the given x, y
 	local file = math.floor((x - self.spacesOffset[1]) / _C.SQUARE_SIZE) + 1
@@ -74,103 +113,93 @@ function Board:getSpaceAt(x, y)
 	return self.spaces[file] and self.spaces[file][rank]
 end
 
--- All spaces run deselect() if the selectedSpace isn't the highlighted space
--- then run select() for the selected space
 function Board:selectSpace(selectedSpace)
-	-- This guard is what makes pendingDeselect reachable
-	if not selectedSpace.highlight then
-		for _, files in ipairs(self.spaces) do
-			for _, _space in ipairs(files) do
-				_space:deselect()
-			end
-		end
+	-- Checks if there was a previous selection, if its not the same deselect it
+	if self.selectedSpace and selectedSpace ~= self.selectedSpace then
+		self.selectedSpace:deselect()
+		self:_clearPossibleMoveOverlays()
 	end
-	selectedSpace:select()
-	local locationString = _C.FILES[selectedSpace.file] .. selectedSpace.rank
-	if selectedSpace.piece then
-		local movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,selectedSpace)
-		if movesForSelectedSpace then
-			if #movesForSelectedSpace ~= 0 then
-				print("\n@" .. locationString .. ": Possible Moves")
-				for _, move in ipairs(movesForSelectedSpace) do
-					print("to " .. _C.FILES[move.file] .. move.rank)
-				end
-			else
-				print("\n@" .. locationString .. ": NO MOVES HERE")
-			end
-		end
-	else
-		print("\n@" .. locationString .. ": NO PIECE TO MOVE")
+
+	-- Track the new selectedSpace
+	self.selectedSpace = selectedSpace
+	self.selectedSpace:select()
+
+	-- Gets possible moves for the selected Piece, sets each moveable Space's possibleMove to true
+	if self.selectedSpace.piece then
+		self:_setPossibleMoveOverlays()
 	end
 end
 
---------------------
---- Input Toggled --
---------------------
--- NOTE: When implementing the game state logic, set up a Board:clearForStateChange()
--- 	needed for fixing some input's persistance such as Board.spaceWithPickedUpPiece
+-- Input Based Functions --
 function Board:onPress(x, y)
-	local space = self:getSpaceAt(x, y)
-	if space then
-		self:selectSpace(space)
-		-- TODO: Just track the selected space,
-		self.selectedSpace = space -- Could set this in selectSpace
-
-		-- refactor this out
-		if space.piece then self.spaceWithPickedUpPiece = space end
+	local targetSpace = self:getSpaceAt(x, y)
+	if targetSpace then
+		self:selectSpace(targetSpace)
 	end
 end
 
 function Board:onRelease(x,y)
-	local targetSpace = self:getSpaceAt(x,y)
-	if self.spaceWithPickedUpPiece then
-		Debug:clearMessages()
-		if self.hoveredSpace then
-			self.hoveredSpace.hovered = false
-			self.hoveredSpace = nil
-		end
-		if targetSpace and not targetSpace.piece then
-			-- If the targetSpace exists and isn't occupied
-			self.spaceWithPickedUpPiece:movePiece(targetSpace)
-			self.spaceWithPickedUpPiece:deselect()
-			targetSpace.piece:putDown()
-			-- Reset Previously tracked move's highlights
-			if self.lastMoveSource and self.lastMoveDest then
-				self.lastMoveSource.postMoveHighlight = false
-				self.lastMoveDest.postMoveHighlight = false
+	if self.selectedSpace then
+		local targetSpace = self:getSpaceAt(x,y)
+		if self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
+			-- Reset the Hover Indicator
+			self:_clearHover()
+
+			if targetSpace and not targetSpace.piece then -- If the targetSpace exists and isn't occupied
+				-- Move the piece to targetSpace
+				self.selectedSpace:movePiece(targetSpace)
+
+				-- Deselect the space and remove overlays
+				self.selectedSpace:deselect()
+				self:_clearPossibleMoveOverlays()
+
+				-- Put down targetSpace's new piece
+				targetSpace.piece:putDown()
+
+				-- Reset Previously tracked move highlights, and track the new move
+				self:_resetMoveTracking()
+				self:_trackMove(targetSpace)
+
+			elseif targetSpace and targetSpace.piece.side ~= self.selectedSpace.piece.side then -- If the targetSpace has an opponent's piece
+				-- Remove the opponent's piece
+				targetSpace:removePiece()
+				-- Move the piece to targetSpace
+				self.selectedSpace:movePiece(targetSpace)
+
+				-- Deselect the space and remove overlays
+				self.selectedSpace:deselect()
+				self:_clearPossibleMoveOverlays()
+
+				-- Put down targetSpace's new piece
+				targetSpace.piece:putDown()
+
+				-- Reset Previously tracked move highlights, and track the new move
+				self:_resetMoveTracking()
+				self:_trackMove(targetSpace)
+
+			elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
+				if self.selectedSpace.pendingDeselect then
+					self.selectedSpace:deselect()
+					self:_clearPossibleMoveOverlays()
+				end
+				self.selectedSpace.piece:putDown()
+
+			else -- If the targetSpace isn't otherwise suitable, put back the piece with no changes and do not deselect
+				self.selectedSpace.piece:putDown()
 			end
-			-- Track the move
-			self.lastMoveSource = self.spaceWithPickedUpPiece
-			self.lastMoveDest = targetSpace
-			-- Set the post move highlight
-			self.lastMoveSource.postMoveHighlight = true
-			self.lastMoveDest.postMoveHighlight = true
-		elseif targetSpace == self.spaceWithPickedUpPiece then
-			-- If the targetSpace is same as the sourceSpace
-			if self.spaceWithPickedUpPiece.pendingDeselect then
-				-- If its pendingDeselect deselect it
-				self.spaceWithPickedUpPiece:deselect()
+
+		elseif self.selectedSpace == targetSpace then -- If the targetSpace was empty and pendingDeselect then deselect it
+			if self.selectedSpace.pendingDeselect then
+				self.selectedSpace:deselect()
 			end
-			self.spaceWithPickedUpPiece.piece:putDown()
-		else
-			-- Put back the piece with no changes if the move isn't otherwise suitable
-			-- Do not deselect on an invalid move
-			self.spaceWithPickedUpPiece.piece:putDown()
-		end
-		self.spaceWithPickedUpPiece = nil
-	elseif targetSpace then
-		if targetSpace.pendingDeselect then
-			-- If the target Space was empty and pendingDeselect then deselect it
-			targetSpace:deselect()
 		end
 	end
 end
 
 function Board:update(input)
-	--- Debug Messages for picked up or selected 
+	--- Debug Messages for picked up or selected
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
-			-- Debug messages
 			local msg
 			if space.highlight then
 				if (space.piece and not space.piece.pickedUp) or not space.piece then
@@ -190,49 +219,45 @@ function Board:update(input)
 		end
 	end
 
-	if self.spaceWithPickedUpPiece then
-		-- Unhover everything
-		for _, file in ipairs(self.spaces) do
-			for _, space in ipairs(file) do
-				space.hovered = false
-			end
-		end
-
+	if self.selectedSpace and self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
+		-- If there is a picked up piece, make it follow the mouse
 		local mX,mY = input:getMousePos()
-		self.spaceWithPickedUpPiece.piece:followMouse(mX,mY)
+		self.selectedSpace.piece:followMouse(mX,mY)
 
-		local hoveredSpace = self:getSpaceAt(mX,mY)
-		-- NOTE: Could I just set self.hoveredSpace.hovered = false before this update to remove checking for all spaces
-		self.hoveredSpace = hoveredSpace
-		if hoveredSpace then
-			hoveredSpace.hovered = true
-			if hoveredSpace ~= self.spaceWithPickedUpPiece then
-				Debug:newMessage("Hovering @ " .. _C.FILES[hoveredSpace.file] .. hoveredSpace.rank, 2)
+		-- Remove the previous hovered space's status
+		self:_clearHover()
+		self.hoveredSpace = self:getSpaceAt(mX,mY)
+		if self.hoveredSpace then
+			-- Set the new hovered space
+			self.hoveredSpace.hovered = true
+			-- Debug Message for Hovered Space
+			if self.hoveredSpace ~= self.selectedSpace then
+				Debug:newMessage("Hovering @ " .. _C.FILES[self.hoveredSpace.file] .. self.hoveredSpace.rank, 2)
 			end
 		end
 	end
 end
 
 function Board:draw()
+	-- Draw the Spaces
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
 			space:draw()
 		end
 	end
 
-	-- Draw all Pieces overall Spaces
+	-- Draw all Pieces overall Spaces, and draw possible moves over those Pieces
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
-			if space.piece and space.piece.z == 0 then space.piece:draw() end
-
-			-- TODO: draw possible move highlights on top if valid
+			space:drawPieceByZ(0)
+			space:drawPossibleMoveOverlay() -- draw possible move highlights on top
 		end
 	end
 
-	-- The picked up Piece is drawn on top
+	-- If a Piece is picked up draw it on top
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
-			if space.piece and space.piece.z == 1 then space.piece:draw() end
+			space:drawPieceByZ(1)
 		end
 	end
 end
