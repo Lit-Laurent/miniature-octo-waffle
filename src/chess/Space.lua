@@ -5,8 +5,10 @@ local Debug = require("src/Debug")
 local Space = {}
 Space.__index = Space
 
-function Space:loadSprites()
+function Space:loadAssets()
 	self.hoverIndicatorSprite = love.graphics.newImage("assets/hoverIndicator.png")
+	self.moveIndicatorSprite = love.graphics.newImage("assets/moveIndicator.png")
+	self.font = love.graphics.getFont()
 end
 
 function Space:new(file,rank,shade,xm,ym)
@@ -57,37 +59,39 @@ function Space:movePiece(newSpace)
 	self:removePiece()
 end
 
-function Space:onSelect()
-	-- If this space was already highlighted, arm a pending deselect.
-	-- It is consumed (deSelect) only when a held piece is released back
-	-- onto this same source square.
-	-- local msg
-	Debug:clearMessages()
-	local msg
+function Space:select()
 	if self.highlight then
 		self.pendingDeselect = true
 	else
 		self.highlight = true
-		msg = ("Space Selected:" .. " @ " .. _C.FILES[self.file] .. self.rank)
 	end
 	if self.piece then
 		self.piece:pickUp()
-		msg = ("Picked up:\n" .. self.piece.side .. " " .. self.piece.class .. " @ " .. _C.FILES[self.file] .. self.rank)
 	end
-	if msg then Debug:newMessage(msg) end
-
 end
 
-function Space:deSelect()
+function Space:emitPossibleMoveHighlights()
+	-- Use in Board on selected space
+end
+
+function Space:deselect()
 	if self.highlight == true then
 		self.highlight = false
 		self.pendingDeselect = false
+
+		-- Clear Debug Messages on a space deselection
 		Debug:clearMessages()
 	end
 end
 
+
+
 function Space:update()
-	-- NOTHING YET
+	-- Nothin yet
+end
+
+function Space:drawPossibleMoveHighlight()
+
 end
 
 function Space:draw()
@@ -108,23 +112,18 @@ function Space:draw()
 		love.graphics.draw(self.hoverIndicatorSprite, unpack(self.pos))
 	end
 
-	-- Draws the aisle mappings on leftmost and downmost aisles
-	local font = love.graphics.getFont()
+	-- Draws the indexes on the first rank and file	
 	if self.rank == 1 or self.file == 1 then
-		if self.shade == "light" then
-			love.graphics.setColor(_C.COLOR.INDEXES.WS)
-		else
-			love.graphics.setColor(_C.COLOR.INDEXES.BS)
-
+		if self.shade == "light" then love.graphics.setColor(_C.COLOR.INDEXES.WS)
+		else love.graphics.setColor(_C.COLOR.INDEXES.BS) end
+		if self.rank == 1 then
+			if not self.rankLabel then self.rankLabel = love.graphics.newText(self.font,_C.FILES[self.file]) end
+			love.graphics.draw(self.rankLabel,self.x+85,self.y+80)
 		end
-	end
-	if self.rank == 1 then
-		if not self.rankLabel then self.rankLabel = love.graphics.newText(font,_C.FILES[self.file]) end
-		love.graphics.draw(self.rankLabel,self.x+85,self.y+80)
-	end
-	if self.file == 1 then
-		if not self.fileLabel then self.fileLabel = love.graphics.newText(font, self.rank) end
-		love.graphics.draw(self.fileLabel,self.x,self.y)
+		if self.file == 1 then
+			if not self.fileLabel then self.fileLabel = love.graphics.newText(self.font, self.rank) end
+			love.graphics.draw(self.fileLabel,self.x,self.y)
+		end
 	end
 end
 
