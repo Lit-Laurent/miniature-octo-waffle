@@ -2,6 +2,8 @@ local _C = require("src/Constants")
 local Space = require("src/chess/Space")
 local Piece = require("src/chess/Piece")
 
+local MoveProcessor = require("src/chess/rules/MoveProcessor")
+
 local Debug = require("src/Debug")
 
 local Board = {}
@@ -9,7 +11,7 @@ Board.spacesOffset = {_C.OFFSET_X, _C.OFFSET_Y}
 Board.spaces = {}
 
 function Board:loadSprites()
-	Space:loadSprites()
+	Space:loadAssets()
 	Piece:loadSprites()
 end
 
@@ -65,7 +67,6 @@ end
 -------------
 -- Helpers --
 -------------
----
 function Board:getSpaceAt(x, y)
 	-- Gets the space at the given x, y
 	local file = math.floor((x - self.spacesOffset[1]) / _C.SQUARE_SIZE) + 1
@@ -73,18 +74,34 @@ function Board:getSpaceAt(x, y)
 	return self.spaces[file] and self.spaces[file][rank]
 end
 
--- All spaces run deSelect() if the selectedSpace isn't the highlighted space
--- then run onSelect() for the selected space
+-- All spaces run deselect() if the selectedSpace isn't the highlighted space
+-- then run select() for the selected space
 function Board:selectSpace(selectedSpace)
 	-- This guard is what makes pendingDeselect reachable
 	if not selectedSpace.highlight then
 		for _, files in ipairs(self.spaces) do
 			for _, _space in ipairs(files) do
-				_space:deSelect()
+				_space:deselect()
 			end
 		end
 	end
-	selectedSpace:onSelect()
+	selectedSpace:select()
+	local locationString = _C.FILES[selectedSpace.file] .. selectedSpace.rank
+	if selectedSpace.piece then
+		local movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,selectedSpace)
+		if movesForSelectedSpace then
+			if #movesForSelectedSpace ~= 0 then
+				print("\n@" .. locationString .. ": Possible Moves")
+				for _, move in ipairs(movesForSelectedSpace) do
+					print("to " .. _C.FILES[move.file] .. move.rank)
+				end
+			else
+				print("\n@" .. locationString .. ": NO MOVES HERE")
+			end
+		end
+	else
+		print("\n@" .. locationString .. ": NO PIECE TO MOVE")
+	end
 end
 
 --------------------
@@ -96,6 +113,10 @@ function Board:onPress(x, y)
 	local space = self:getSpaceAt(x, y)
 	if space then
 		self:selectSpace(space)
+		-- TODO: Just track the selected space,
+		self.selectedSpace = space -- Could set this in selectSpace
+
+		-- refactor this out
 		if space.piece then self.spaceWithPickedUpPiece = space end
 	end
 end
@@ -111,7 +132,7 @@ function Board:onRelease(x,y)
 		if targetSpace and not targetSpace.piece then
 			-- If the targetSpace exists and isn't occupied
 			self.spaceWithPickedUpPiece:movePiece(targetSpace)
-			self.spaceWithPickedUpPiece:deSelect()
+			self.spaceWithPickedUpPiece:deselect()
 			targetSpace.piece:putDown()
 			-- Reset Previously tracked move's highlights
 			if self.lastMoveSource and self.lastMoveDest then
@@ -128,7 +149,7 @@ function Board:onRelease(x,y)
 			-- If the targetSpace is same as the sourceSpace
 			if self.spaceWithPickedUpPiece.pendingDeselect then
 				-- If its pendingDeselect deselect it
-				self.spaceWithPickedUpPiece:deSelect()
+				self.spaceWithPickedUpPiece:deselect()
 			end
 			self.spaceWithPickedUpPiece.piece:putDown()
 		else
@@ -140,12 +161,35 @@ function Board:onRelease(x,y)
 	elseif targetSpace then
 		if targetSpace.pendingDeselect then
 			-- If the target Space was empty and pendingDeselect then deselect it
-			targetSpace:deSelect()
+			targetSpace:deselect()
 		end
 	end
 end
 
 function Board:update(input)
+	--- Debug Messages for picked up or selected 
+	for _, file in ipairs(self.spaces) do
+		for _, space in ipairs(file) do
+			-- Debug messages
+			local msg
+			if space.highlight then
+				if (space.piece and not space.piece.pickedUp) or not space.piece then
+					msg = ("Selected @ " .. _C.FILES[space.file] .. space.rank)
+					if space.piece then
+						msg = (msg .. "\n " .. space.piece.side .. " " .. space.piece.class)
+					end
+				elseif space.piece.pickedUp then
+					msg = ("Picked Up @ " .. _C.FILES[space.file] .. space.rank .. "\n " .. space.piece.side .. " " .. space.piece.class)
+				end
+				if msg then
+					Debug:removeMessage(1)
+					Debug:removeMessage(2)
+					Debug:newMessage(msg,1)
+				end
+			end
+		end
+	end
+
 	if self.spaceWithPickedUpPiece then
 		-- Unhover everything
 		for _, file in ipairs(self.spaces) do
@@ -158,13 +202,14 @@ function Board:update(input)
 		self.spaceWithPickedUpPiece.piece:followMouse(mX,mY)
 
 		local hoveredSpace = self:getSpaceAt(mX,mY)
+		-- NOTE: Could I just set self.hoveredSpace.hovered = false before this update to remove checking for all spaces
 		self.hoveredSpace = hoveredSpace
-		Debug:removeMessage(1)
 		if hoveredSpace then
 			hoveredSpace.hovered = true
-			Debug:newMessage("Hovering @ " .. _C.FILES[hoveredSpace.file] .. hoveredSpace.rank, 1)
+			if hoveredSpace ~= self.spaceWithPickedUpPiece then
+				Debug:newMessage("Hovering @ " .. _C.FILES[hoveredSpace.file] .. hoveredSpace.rank, 2)
+			end
 		end
-
 	end
 end
 
@@ -174,12 +219,16 @@ function Board:draw()
 			space:draw()
 		end
 	end
+
 	-- Draw all Pieces overall Spaces
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
 			if space.piece and space.piece.z == 0 then space.piece:draw() end
+
+			-- TODO: draw possible move highlights on top if valid
 		end
 	end
+
 	-- The picked up Piece is drawn on top
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
