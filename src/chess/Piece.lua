@@ -1,7 +1,7 @@
 local _C = require("src/Constants")
 
 -- Used against mouse positions for pickedUp pieces in followMouse()
-local GRAB_OFFSET_X, GRAB_OFFSET_Y = -25, -5
+local GRAB_OFFSET_X, GRAB_OFFSET_Y = -40, -40
 
 local Piece = {}
 Piece.__index = Piece
@@ -66,9 +66,12 @@ function Piece:putDown()
 end
 
 function Piece:followMouse(mX,mY)
-	-- TODO: clamp this to the board's x,y,w,h
 	if self.pickedUp then
-		self.x, self.y = mX + GRAB_OFFSET_X, mY + GRAB_OFFSET_Y
+		local EDGE_OVERHANGX, EDGE_OVERHANGY = 20, 10
+		local mouseX, mouseY = mX + GRAB_OFFSET_X, mY + GRAB_OFFSET_Y
+		local boardX, boardY = _C.OFFSET_X, _C.OFFSET_Y
+		self.x = math.max(boardX - EDGE_OVERHANGX, math.min(mouseX, boardX + _C.BOARD_LEN * _C.SQUARE_SIZE - self.w + EDGE_OVERHANGX))
+		self.y = math.max(boardY - EDGE_OVERHANGY, math.min(mouseY, boardY + _C.BOARD_LEN * _C.SQUARE_SIZE - self.h + EDGE_OVERHANGY))
 	end
 end
 
