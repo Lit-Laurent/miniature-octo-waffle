@@ -72,6 +72,7 @@ end
 
 function Board:_setPossibleMoveOverlays()
 	local movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,self.selectedSpace)
+	self.selectedSpace.validMoves = movesForSelectedSpace
 	if movesForSelectedSpace then
 		for _, moveableSpace in ipairs(movesForSelectedSpace) do
 			moveableSpace.possibleMove = true
@@ -79,7 +80,17 @@ function Board:_setPossibleMoveOverlays()
 	end
 end
 
+function Board:_checkMoveForValidity(targetSpace)
+	for _, validMove in ipairs(self.selectedSpace.validMoves) do
+		if targetSpace == validMove then
+			return true
+		end
+	end
+	return false
+end
+
 function Board:_clearPossibleMoveOverlays()
+	self.selectedSpace.validMoves = nil
 	for _, file in ipairs(self.spaces) do
 		for _, space in ipairs(file) do
 			space.possibleMove = false
@@ -142,9 +153,8 @@ function Board:onRelease(x,y)
 		if self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
 			-- Reset the Hover Indicator
 			self:_clearHover()
-
-			if targetSpace then
-				if not targetSpace.piece then -- If the targetSpace exists and isn't occupied
+			if targetSpace and self:_checkMoveForValidity(targetSpace) then -- If the targetSpace exists and is valid
+				if not targetSpace.piece then -- If the targetSpace isn't occupied
 					-- Move the piece to targetSpace
 					self.selectedSpace:movePiece(targetSpace)
 
@@ -175,16 +185,14 @@ function Board:onRelease(x,y)
 					-- Reset Previously tracked move highlights, and track the new move
 					self:_resetMoveTracking()
 					self:_trackMove(targetSpace)
-
-				elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
-					if self.selectedSpace.pendingDeselect then
-						self.selectedSpace:deselect()
-						self:_clearPossibleMoveOverlays()
-					end
-					self.selectedSpace.piece:putDown()
-				else
-					self.selectedSpace.piece:putDown()
 				end
+
+			elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
+				if self.selectedSpace.pendingDeselect then
+					self.selectedSpace:deselect()
+					self:_clearPossibleMoveOverlays()
+				end
+				self.selectedSpace.piece:putDown()
 			else
 				self.selectedSpace.piece:putDown()
 			end
