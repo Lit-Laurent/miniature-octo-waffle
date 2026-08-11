@@ -39,13 +39,11 @@ function Board:initSpaces()
 end
 
 function Board:setupPieces()
-	-- Fill the back two ranks of each side with their own Pieces
 	local FID = {A = 1, B = 2, C = 3, D = 4, E = 5, F = 6, G = 7, H = 8}
 	for _, s in ipairs(_C.SIDES) do
 		for file = 1, _C.BOARD_LEN do
 			local space = self.spaces[file][s.backrank]
-			-- this is only here because I was messing around with board length
-			if not space then goto continue end
+			if not space then goto continue end -- this is only here because I was messing around with board length
 			if file == FID.A or file == FID.H then
 				space.piece = Piece:new("rook",s.side,space.pos)
 			elseif file == FID.B or file == FID.G then
@@ -145,46 +143,49 @@ function Board:onRelease(x,y)
 			-- Reset the Hover Indicator
 			self:_clearHover()
 
-			if targetSpace and not targetSpace.piece then -- If the targetSpace exists and isn't occupied
-				-- Move the piece to targetSpace
-				self.selectedSpace:movePiece(targetSpace)
+			if targetSpace then
+				if not targetSpace.piece then -- If the targetSpace exists and isn't occupied
+					-- Move the piece to targetSpace
+					self.selectedSpace:movePiece(targetSpace)
 
-				-- Deselect the space and remove overlays
-				self.selectedSpace:deselect()
-				self:_clearPossibleMoveOverlays()
-
-				-- Put down targetSpace's new piece
-				targetSpace.piece:putDown()
-
-				-- Reset Previously tracked move highlights, and track the new move
-				self:_resetMoveTracking()
-				self:_trackMove(targetSpace)
-
-			elseif targetSpace and targetSpace.piece.side ~= self.selectedSpace.piece.side then -- If the targetSpace has an opponent's piece
-				-- Remove the opponent's piece
-				targetSpace:removePiece()
-				-- Move the piece to targetSpace
-				self.selectedSpace:movePiece(targetSpace)
-
-				-- Deselect the space and remove overlays
-				self.selectedSpace:deselect()
-				self:_clearPossibleMoveOverlays()
-
-				-- Put down targetSpace's new piece
-				targetSpace.piece:putDown()
-
-				-- Reset Previously tracked move highlights, and track the new move
-				self:_resetMoveTracking()
-				self:_trackMove(targetSpace)
-
-			elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
-				if self.selectedSpace.pendingDeselect then
+					-- Deselect the space and remove overlays
 					self.selectedSpace:deselect()
 					self:_clearPossibleMoveOverlays()
-				end
-				self.selectedSpace.piece:putDown()
 
-			else -- If the targetSpace isn't otherwise suitable, put back the piece with no changes and do not deselect
+					-- Put down targetSpace's new piece
+					targetSpace.piece:putDown()
+
+					-- Reset Previously tracked move highlights, and track the new move
+					self:_resetMoveTracking()
+					self:_trackMove(targetSpace)
+
+				elseif targetSpace.piece.side ~= self.selectedSpace.piece.side then -- If the targetSpace has an opponent's piece
+					-- Remove the opponent's piece
+					targetSpace:removePiece()
+					-- Move the piece to targetSpace
+					self.selectedSpace:movePiece(targetSpace)
+
+					-- Deselect the space and remove overlays
+					self.selectedSpace:deselect()
+					self:_clearPossibleMoveOverlays()
+
+					-- Put down targetSpace's new piece
+					targetSpace.piece:putDown()
+
+					-- Reset Previously tracked move highlights, and track the new move
+					self:_resetMoveTracking()
+					self:_trackMove(targetSpace)
+
+				elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
+					if self.selectedSpace.pendingDeselect then
+						self.selectedSpace:deselect()
+						self:_clearPossibleMoveOverlays()
+					end
+					self.selectedSpace.piece:putDown()
+				else
+					self.selectedSpace.piece:putDown()
+				end
+			else
 				self.selectedSpace.piece:putDown()
 			end
 
