@@ -1,6 +1,21 @@
 # miniature-octo-waffle
-A simple Chess game written in lua for LOVE2D.
+Chess written in lua for LOVE2D.
+> WIP
 
-## about
-Still is a WIP, Basic Input is setup for drag/drop and selecting/deselecting, Board, Space and Piece files are well structured.
-Need to implement Rules for the pieces to follow when attempting a move.
+## Features:
+```
+Piece selection and deselection on click,
+Possible move highlights for the selected piece,
+Drag-and-Drop moves,
+```
+
+### Missing:
+```
+Turn based play, timers,
+
+Check, Check Mate and preventing moves that leave one's King in check,
+
+Pawns: Promotion and En Passant
+Kings: Castling
+```
+
