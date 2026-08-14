@@ -19,6 +19,7 @@ function Board:setup()
 	-- Call on start and when resetting the board
 	self:initSpaces()
 	self:setupPieces()
+	self.turn = "white"
 end
 
 function Board:initSpaces()
@@ -98,8 +99,8 @@ function Board:_clearPossibleMoveOverlays()
 	end
 end
 
-function Board:_trackMove(targetSpace)
-	self.lastMoveSource = self.selectedSpace
+function Board:_trackMove(sourceSpace, targetSpace)
+	self.lastMoveSource = sourceSpace
 	self.lastMoveDest = targetSpace
 
 	-- Set the post move highlight
@@ -111,7 +112,15 @@ function Board:_resetMoveTracking()
 	if self.lastMoveSource and self.lastMoveDest then
 		self.lastMoveSource.postMoveHighlight = false
 		self.lastMoveDest.postMoveHighlight = false
+		self.lastMoveSource = nil
+		self.lastMoveDest = nil -- Should these be unset? It seems safer even though they are always set to something else when the value would be stale.
 	end
+end
+
+function Board:_endTurn() -- TODO: implement after any action that ends in moving,
+                          -- also require board.turn to == whatever targeted piece's side is when attempting to move else select but dont pickup
+	if self.turn == "white" then self.turn = "black"
+	elseif self.turn == "black" then self.turn = "white" end
 end
 
 -- Space selection --
@@ -122,24 +131,26 @@ function Board:getSpaceAt(x, y)
 	return self.spaces[file] and self.spaces[file][rank]
 end
 
-function Board:selectSpace(selectedSpace)
-	-- Checks if there was a previous selection, if its not the same deselect it
-	if self.selectedSpace and selectedSpace ~= self.selectedSpace then
-		self.selectedSpace:deselect()
-		self:_clearPossibleMoveOverlays()
-	end
-
+function Board:selectSpace(space)
+	if space ~= self.selectedSpace then self:deselectSpace() end
 	-- Track the new selectedSpace
-	self.selectedSpace = selectedSpace
+	self.selectedSpace = space
 	self.selectedSpace:select()
-
 	-- Gets possible moves for the selected Piece, sets each moveable Space's possibleMove to true
 	if self.selectedSpace.piece then
 		self:_setPossibleMoveOverlays()
 	end
 end
 
--- Input Based Functions --
+function Board:deselectSpace()
+	if self.selectedSpace then
+		self.selectedSpace:deselect()
+		self:_clearPossibleMoveOverlays()
+		self.selectedSpace = nil
+	end
+end
+
+-- on Input --
 function Board:onPress(x, y)
 	local targetSpace = self:getSpaceAt(x, y)
 	if targetSpace then
@@ -148,56 +159,33 @@ function Board:onPress(x, y)
 end
 
 function Board:onRelease(x,y)
-	if self.selectedSpace then
-		local targetSpace = self:getSpaceAt(x,y)
+	if self.selectedSpace then -- If there is a space selected while releasing click
+		local targetSpace = self:getSpaceAt(x,y) -- Which space the release happened on
 		if self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
-			-- Reset the Hover Indicator
 			self:_clearHover()
-			if targetSpace and self:_checkMoveForValidity(targetSpace) then -- If the targetSpace exists and is valid
-				if not targetSpace.piece then -- If the targetSpace isn't occupied
-					-- Move the piece to targetSpace
-					self.selectedSpace:movePiece(targetSpace)
-
-					-- Deselect the space and remove overlays
-					self.selectedSpace:deselect()
-					self:_clearPossibleMoveOverlays()
-
-					-- Put down targetSpace's new piece
+			if targetSpace and self:_checkMoveForValidity(targetSpace) then
+				local sourceSpace = self.selectedSpace
+				self:_resetMoveTracking()
+				if not targetSpace.piece then
+					sourceSpace:movePiece(targetSpace)
+					self:deselectSpace()
 					targetSpace.piece:putDown()
-
-					-- Reset Previously tracked move highlights, and track the new move
-					self:_resetMoveTracking()
-					self:_trackMove(targetSpace)
-
-				elseif targetSpace.piece.side ~= self.selectedSpace.piece.side then -- If the targetSpace has an opponent's piece
-					-- Remove the opponent's piece
+				elseif targetSpace.piece.side ~= self.selectedSpace.piece.side then
 					targetSpace:removePiece()
-					-- Move the piece to targetSpace
-					self.selectedSpace:movePiece(targetSpace)
-
-					-- Deselect the space and remove overlays
-					self.selectedSpace:deselect()
-					self:_clearPossibleMoveOverlays()
-
-					-- Put down targetSpace's new piece
+					sourceSpace:movePiece(targetSpace)
+					self:deselectSpace()
 					targetSpace.piece:putDown()
-
-					-- Reset Previously tracked move highlights, and track the new move
-					self:_resetMoveTracking()
-					self:_trackMove(targetSpace)
 				end
-
-			elseif targetSpace == self.selectedSpace then -- If the targetSpace is same as where the piece came from
-				if self.selectedSpace.pendingDeselect then
-					self.selectedSpace:deselect()
-					self:_clearPossibleMoveOverlays()
-				end
+				self:_trackMove(sourceSpace, targetSpace)
+			elseif targetSpace == self.selectedSpace then
 				self.selectedSpace.piece:putDown()
+				if self.selectedSpace.pendingDeselect then
+					self:deselectSpace()
+				end
 			else
 				self.selectedSpace.piece:putDown()
 			end
-
-		elseif self.selectedSpace == targetSpace then -- If the targetSpace was empty and pendingDeselect then deselect it
+		elseif self.selectedSpace == targetSpace then
 			if self.selectedSpace.pendingDeselect then
 				self.selectedSpace:deselect()
 			end
@@ -205,6 +193,7 @@ function Board:onRelease(x,y)
 	end
 end
 
+-- Game Update/Draw --
 function Board:update(input)
 	--- Debug Messages for picked up or selected
 	for _, file in ipairs(self.spaces) do
