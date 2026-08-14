@@ -19,7 +19,6 @@ function Board:setup()
 	-- Call on start and when resetting the board
 	self:initSpaces()
 	self:setupPieces()
-	self.turn = "white"
 end
 
 function Board:setActions(actions)
@@ -121,12 +120,6 @@ function Board:_resetMoveTracking()
 	end
 end
 
-function Board:_endTurn() -- TODO: implement after any action that ends in moving,
-                          -- also require board.turn to == whatever targeted piece's side is when attempting to move else select but dont pickup
-	if self.turn == "white" then self.turn = "black"
-	elseif self.turn == "black" then self.turn = "white" end
-end
-
 -- Space selection --
 function Board:getSpaceAt(x, y)
 	-- Gets the space at the given x, y
@@ -141,7 +134,8 @@ function Board:selectSpace(space, turn)
 	self.selectedSpace = space
 	self.selectedSpace:select(turn)
 	-- Gets possible moves for the selected Piece, sets each moveable Space's possibleMove to true
-	if self.selectedSpace.piece then
+	if self.selectedSpace.piece and self.selectedSpace.piece.side == turn then
+		-- NOTE: idk if I want the possible move's to always show up right now its just the playing side shows moves
 		self:_setPossibleMoveOverlays()
 	end
 end

@@ -5,7 +5,7 @@ local board = require("src/chess/Board")
 -- Game States: StartMenu, PlayerControl, PlayerMenu, PauseMenu
 local GameStateManager = {}
 
-local STATE_EVENTS = {
+local STATE_EVENTS = { -- Could possibly remove I don't know if I need state based events
 	StartMenu     = "StartMenuEvents",
 	Chess         = "Chess",
 }
