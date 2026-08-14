@@ -22,6 +22,10 @@ function Board:setup()
 	self.turn = "white"
 end
 
+function Board:setActions(actions)
+	self.actions = actions
+end
+
 function Board:initSpaces()
 	self.spaces = {}
 	-- Tracked Spaces
@@ -131,11 +135,11 @@ function Board:getSpaceAt(x, y)
 	return self.spaces[file] and self.spaces[file][rank]
 end
 
-function Board:selectSpace(space)
+function Board:selectSpace(space, turn)
 	if space ~= self.selectedSpace then self:deselectSpace() end
 	-- Track the new selectedSpace
 	self.selectedSpace = space
-	self.selectedSpace:select()
+	self.selectedSpace:select(turn)
 	-- Gets possible moves for the selected Piece, sets each moveable Space's possibleMove to true
 	if self.selectedSpace.piece then
 		self:_setPossibleMoveOverlays()
@@ -151,14 +155,14 @@ function Board:deselectSpace()
 end
 
 -- on Input --
-function Board:onPress(x, y)
+function Board:onPress(x, y, turn)
 	local targetSpace = self:getSpaceAt(x, y)
 	if targetSpace then
-		self:selectSpace(targetSpace)
+		self:selectSpace(targetSpace, turn)
 	end
 end
 
-function Board:onRelease(x,y)
+function Board:onRelease(x, y)
 	if self.selectedSpace then -- If there is a space selected while releasing click
 		local targetSpace = self:getSpaceAt(x,y) -- Which space the release happened on
 		if self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
@@ -177,6 +181,7 @@ function Board:onRelease(x,y)
 					targetSpace.piece:putDown()
 				end
 				self:_trackMove(sourceSpace, targetSpace)
+				self.actions.endTurn()
 			elseif targetSpace == self.selectedSpace then
 				self.selectedSpace.piece:putDown()
 				if self.selectedSpace.pendingDeselect then

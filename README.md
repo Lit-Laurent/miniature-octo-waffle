@@ -4,14 +4,15 @@ Chess written in lua for LOVE2D.
 
 ## Features:
 ```
-Piece selection and deselection on click,
+Basic Turn Based setup,
+Space selection onClick and deselection onRelease of a previously selected space,
 Possible move highlights for the selected piece,
 Drag-and-Drop moves,
 ```
 
 ### Missing:
 ```
-Turn based play, timers,
+Timers,
 
 Check, Check Mate and preventing moves that leave one's King in check,
 

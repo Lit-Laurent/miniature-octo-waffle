@@ -7,38 +7,46 @@ local GameStateManager = {}
 
 local STATE_EVENTS = {
 	StartMenu     = "StartMenuEvents",
-	Chess         = "Chess"
-	-- TODO: change to WhiteMove / BlackMove
+	Chess         = "Chess",
 }
 
 function GameStateManager:load()
+	board:setActions({
+		endTurn = function() self:endTurn() end
+	})
+
 	board:loadAssets()
 	Input:load()
+
 	self:newGame()
 end
 
 function GameStateManager:newGame()
 	board:setup()
+	self.turn = "white"
 	self:setGameState("Chess")
 end
 
 function GameStateManager:unloadGame()
 	-- Unload anything within the playable game
+	-- Add here
+
 	self:setGameState("StartMenu")
 end
 
 function GameStateManager:setGameState(newState)
 	self.state = newState
-	--[[KeyEventsManager:load(STATE_EVENTS[self.state], {
-		setGameState = function(state) self:setGameState(state) end,
-	})
-	InputManager:resetHeldKeys()
-	]]--
 end
 
-function GameStateManager._updateInPlay() -- TODO: Rename this idk what to call it
+function GameStateManager:endTurn()
+	if self.turn == "white" then
+		self.turn = "black"
+	else self.turn = "white" end
+end
+
+function GameStateManager:updateChess()
 	if Input.pressed then
-		board:onPress(Input.pressX, Input.pressY)
+		board:onPress(Input.pressX, Input.pressY, self.turn)
 	end
 	if Input.released then
 		board:onRelease(Input.releaseX, Input.releaseY)
@@ -50,7 +58,7 @@ function GameStateManager:update(dt)
 	if self.state == "StartMenu" then
 		-- StartMenu:update(dt)
 	elseif self.state == "Chess" then
-		self._updateInPlay()
+		self:updateChess()
 	end
 	Input:resetFlags()
 end
@@ -62,8 +70,10 @@ function GameStateManager:draw()
 	end
 
 	board:draw()
-	Debug:draw() -- Just notifications, can be blocked by menus idc
+	Debug:draw()
+
 	-- Overlay menus on top of Game
+	-- ExampleMenu:draw()
 end
 
 return GameStateManager

@@ -59,13 +59,13 @@ function Space:movePiece(newSpace)
 	self:removePiece()
 end
 
-function Space:select()
+function Space:select(turn)
 	if self.highlight then
 		self.pendingDeselect = true
 	else
 		self.highlight = true
 	end
-	if self.piece then
+	if self.piece and self.piece.side == turn then
 		self.piece:pickUp()
 	end
 end
