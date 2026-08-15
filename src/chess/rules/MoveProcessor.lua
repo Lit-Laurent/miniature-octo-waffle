@@ -1,23 +1,14 @@
--- TODO: wire this into Board,
--- 	when you pick up a piece off a space (until the space is deselected),
--- 		give a mark to all spaces, present in the table returned from getValidMoves(spaces,space)
-
 local PieceMoves      = require("src/chess/rules/PieceMoves")
 local getPawnMoves    = PieceMoves.getPawnMoves
 local getKnightMoves  = PieceMoves.getKnightMoves
 local getKingMoves    = PieceMoves.getKingMoves
 local getSlidingMoves = PieceMoves.getSlidingMoves
 
-
--- NOTE: returns psuedo-legal moves:
--- 	Not off the board,
--- 	Not taking a space your side already occupies, and
--- 	Not blocked by your side's pieces or oppenent's pieces that you can capture
-
-local function getMovesForPiece(spaces, piece, file, rank)
-	-- TODO: add En Passant
+-- Gets all "legal" moves that don't consider whether you leave your king in check
+local function getMovesForPiece(spaces, piece, file, rank, passantableSpace)
+	-- TODO: add promotion on moving to furthest rank
 	if piece.class == "pawn" then
-		return getPawnMoves(spaces, piece, file, rank)
+		return getPawnMoves(spaces, piece, file, rank, passantableSpace)
 	elseif piece.class == "knight" then
 		return getKnightMoves(spaces, piece, file, rank)
 	elseif piece.class == "king" then
@@ -32,9 +23,9 @@ end
 
 local MoveProcessor = {}
 
-function MoveProcessor:getValidMoves(spaces,space)
+function MoveProcessor:getValidMoves(spaces,space, passantableSpace)
 	if not space.piece then return false end
-	local pieceMoves = getMovesForPiece(spaces, space.piece, space.file, space.rank)
+	local pieceMoves = getMovesForPiece(spaces, space.piece, space.file, space.rank, passantableSpace)
 
 	-- TODO: check pieceMoves to filter out moves that would leave you in Check
 	-- 		Probably would need to set up a function to find all Pieces that have LOS with with the selected Space

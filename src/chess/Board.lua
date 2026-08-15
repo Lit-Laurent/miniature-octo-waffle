@@ -74,23 +74,36 @@ function Board:_clearHover()
 	self.hoveredSpace = nil
 end
 
-function Board:_setPossibleMoveOverlays()
-	local movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,self.selectedSpace)
-	self.selectedSpace.validMoves = movesForSelectedSpace
-	if movesForSelectedSpace then
-		for _, moveableSpace in ipairs(movesForSelectedSpace) do
-			moveableSpace.possibleMove = true
+function Board:_checkMoveForValidity(targetSpace)
+	for _, validMove in ipairs(self.selectedSpace.validMoves) do
+		if targetSpace == validMove.space then
+			return validMove
+		end
+	end
+	return false
+end
+
+function Board:_getPassantableSpace()
+	self.passantableSpace = nil
+	if self.lastMoveSource and self.lastMoveDest then
+		if self.lastMoveDest.piece.class == "pawn" then
+			if math.abs(self.lastMoveSource.rank - self.lastMoveDest.rank) > 1 then
+				self.passantableSpace = self.lastMoveDest
+			end
 		end
 	end
 end
 
-function Board:_checkMoveForValidity(targetSpace)
-	for _, validMove in ipairs(self.selectedSpace.validMoves) do
-		if targetSpace == validMove then
-			return true
+function Board:_setPossibleMoveOverlays()
+	local movesForSelectedSpace
+	self:_getPassantableSpace()
+	movesForSelectedSpace = MoveProcessor:getValidMoves(self.spaces,self.selectedSpace,self.passantableSpace)
+	self.selectedSpace.validMoves = movesForSelectedSpace
+	if movesForSelectedSpace then
+		for _, validMove in ipairs(movesForSelectedSpace) do
+			validMove.space.possibleMove = true
 		end
 	end
-	return false
 end
 
 function Board:_clearPossibleMoveOverlays()
@@ -161,20 +174,23 @@ function Board:onRelease(x, y)
 		local targetSpace = self:getSpaceAt(x,y) -- Which space the release happened on
 		if self.selectedSpace.piece and self.selectedSpace.piece.pickedUp then
 			self:_clearHover()
-			if targetSpace and self:_checkMoveForValidity(targetSpace) then
+			local validMove = targetSpace and self:_checkMoveForValidity(targetSpace)
+			if validMove then
 				local sourceSpace = self.selectedSpace
+				local destSpace = validMove.space
 				self:_resetMoveTracking()
-				if not targetSpace.piece then
-					sourceSpace:movePiece(targetSpace)
-					self:deselectSpace()
-					targetSpace.piece:putDown()
-				elseif targetSpace.piece.side ~= self.selectedSpace.piece.side then
-					targetSpace:removePiece()
-					sourceSpace:movePiece(targetSpace)
-					self:deselectSpace()
-					targetSpace.piece:putDown()
+				if validMove.enPassant then
+					validMove.capturedSpace:removePiece()
+					sourceSpace:movePiece(destSpace)
+				elseif not destSpace.piece then
+					sourceSpace:movePiece(destSpace)
+				elseif destSpace.piece.side ~= sourceSpace.piece.side then
+					destSpace:removePiece()
+					sourceSpace:movePiece(destSpace)
 				end
-				self:_trackMove(sourceSpace, targetSpace)
+				self:deselectSpace()
+				destSpace.piece:putDown()
+				self:_trackMove(sourceSpace, destSpace)
 				self.actions.endTurn()
 			elseif targetSpace == self.selectedSpace then
 				self.selectedSpace.piece:putDown()

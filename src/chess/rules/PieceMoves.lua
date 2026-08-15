@@ -1,13 +1,6 @@
--- NOTE: Crude check for spaces availiable to a piece -
--- Sorts any space that exists within the pieces reach, (only knights can move over units)
--- 	Ignores spaces that have their own side's pieces,
--- 	Stores: Open Spaces and Spaces containing Pieces from the opposing side 
--- 		they are treated the same as of now
-
 local _C = require("src/Constants")
 
-local function getPawnMoves(spaces, piece, file, rank)
-	-- TODO: add En passant
+local function getPawnMoves(spaces, piece, file, rank, passantableSpace)
 	local moves = {}
 
 	local onSpawn,dir
@@ -20,11 +13,13 @@ local function getPawnMoves(spaces, piece, file, rank)
 	end
 
 	-- Check a rank ahead of the pawn for a space to move to, if it is on it's onSpawn check another rank
+	-- TODO: check if the move will leave you on the opposing sides backrank, if so pass promotion = true, with the space so you can promote the piece
+	-- 	can default it to replacing the pawn a queen, but it should really cause a popup allowing for, Queen/Bishop/Knight/Rook
 	for yMove = 1, onSpawn and 2 or 1 do
 		local checkSpace = spaces[file][rank+(yMove*dir)]
 		if checkSpace then
 			if not checkSpace.piece then
-				table.insert(moves,checkSpace)
+				table.insert(moves,{space = checkSpace})
 			else
 				-- There is a piece in the way, stop looking
 				break
@@ -36,7 +31,7 @@ local function getPawnMoves(spaces, piece, file, rank)
 	if file < _C.BOARD_LEN then
 		local checkTakeRight = spaces[file+1][rank+dir]
 		if checkTakeRight and checkTakeRight.piece and checkTakeRight.piece.side ~= piece.side then
-			table.insert(moves,checkTakeRight)
+			table.insert(moves,{space = checkTakeRight})
 		end
 	end
 
@@ -44,10 +39,22 @@ local function getPawnMoves(spaces, piece, file, rank)
 	if file > 1 then
 		local checkTakeLeft = spaces[file-1][rank+dir]
 		if checkTakeLeft and checkTakeLeft.piece and checkTakeLeft.piece.side ~= piece.side then
-			table.insert(moves,checkTakeLeft)
+			table.insert(moves,{space = checkTakeLeft})
 		end
 	end
 
+	-- Check for En Passant
+	if passantableSpace then
+		local canCapture = false
+		if file < _C.BOARD_LEN and spaces[file+1][rank] == passantableSpace then
+			canCapture = true
+		elseif file > 1 and spaces[file-1][rank] == passantableSpace then
+			canCapture = true
+		end
+		if canCapture then
+			table.insert(moves, {space = spaces[passantableSpace.file][passantableSpace.rank + dir], enPassant = true, capturedSpace = passantableSpace})
+		end
+	end
 	return moves
 end
 
@@ -64,10 +71,10 @@ local function getKnightMoves(spaces, piece, file, rank)
 
 			if not checkSpace.piece then
 				-- If there isn't a piece then it's available
-				table.insert(moves, checkSpace)
+				table.insert(moves, {space = checkSpace})
 			elseif checkSpace.piece.side ~= piece.side then
 				-- If it's from the other side, you can take
-				table.insert(moves, checkSpace)
+				table.insert(moves, {space = checkSpace})
 			end
 		end
 	end
@@ -87,12 +94,12 @@ local function getKingMoves(spaces, piece, file, rank)
 			local checkSpace = spaces[newFile][newRank]
 			if not checkSpace.piece then
 				-- If there isn't a piece then the space is available
-				table.insert(moves, checkSpace)
+				table.insert(moves, {space = checkSpace})
 			else
 				-- If there is a piece
 				if checkSpace.piece.side ~= piece.side then
 					-- If it's from the other side, you can take
-					table.insert(moves, checkSpace)
+					table.insert(moves, {space = checkSpace})
 				end
 			end
 		end
@@ -124,11 +131,11 @@ local function getSlidingMoves(spaces, piece, file, rank)
 
 			if not checkSpace.piece then
 				-- If there isn't a piece then it's available, keep checking further
-				table.insert(moves, checkSpace)
+				table.insert(moves, {space = checkSpace})
 			else
 				if checkSpace.piece.side ~= piece.side then
 					-- If it's from the other side, you can take, but can't move past
-					table.insert(moves, checkSpace)
+					table.insert(moves, {space = checkSpace})
 					break
 				else
 					-- If it's from the same side, cannot move here or past
@@ -147,21 +154,20 @@ return {
 	getSlidingMoves = getSlidingMoves,
 }
 
--- NOTE: Movement Logic for each piece
-
+-- NOTE: Piece Logic
 -- FOR PAWNS
 --  --  Can move forward, 1 rank (Inverses direction for Black)
 -- 	-- If on PawnRank then can move 2 ranks (if the first rank isn't blocked)
 -- 	-- Can take enemy piece if the piece is up 1 rank, and over 1 file either directions
--- 	-- TODO: Add En Passent ruling later
+-- 	-- Can En Passant if 1 file to the side of a pawn that had just moved two ranks
 
 -- FOR KNIGHTS
--- 	-- Check the fixed KNIGHT_MOVES offsets, skip off-board jumps
+-- 	-- Checks the fixed _C.KNIGHT_MOVES offsets, skip off-board jumps
 
 -- FOR KING
--- 	Checks all 8 directions for a single space each
+-- 	-- Checks _C.ALL_DIRECTIONS for a single space each direction
 
 -- FOR ROOKS / BISHOPS / QUEENS
--- 	-- Shared getSlidingMoves helper loops through the given directions,
--- 		-- If there is something in the way, or the board ends, break the loop
--- 			-- If there is a takable piece, the spot is valid but stops further searching in that direction
+--  -- Shared getSlidingMoves helper loops through the given directions,
+-- 	-- If there is something in the way, or the board ends, break the loop
+-- 	-- If a capturable piece exists, the space is valid but stops searching in that direction
